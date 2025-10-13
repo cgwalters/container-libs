@@ -1532,11 +1532,14 @@ func (d *Driver) get(id string, disableShifting bool, options graphdriver.MountO
 
 	needsIDMapping := !disableShifting && len(options.UidMaps) > 0 && len(options.GidMaps) > 0 && d.options.mountProgram == ""
 
-	if len(optsList) == 0 {
-		if d.options.mountOptions != "" {
-			optsList = strings.Split(d.options.mountOptions, ",")
-		}
-	} else {
+	// Merge global mount options with per-mount options.
+	// Global options are added first so per-mount options can override them.
+	if d.options.mountOptions != "" {
+		globalOpts := strings.Split(d.options.mountOptions, ",")
+		optsList = append(globalOpts, optsList...)
+	}
+
+	if len(optsList) > 0 {
 		// If metacopy=on is present in d.options.mountOptions it must be present in the mount
 		// options otherwise the kernel refuses to follow the metacopy xattr.
 		if hasMetacopyOption(strings.Split(d.options.mountOptions, ",")) && !hasMetacopyOption(options.Options) {
