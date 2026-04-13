@@ -510,3 +510,28 @@ func (s *proxySuite) TestProxyGetBlob() {
 	}
 	assert.NoError(t, err)
 }
+
+// Verify that a policy that denies all images is correctly rejected
+// for both manifest listed and direct per-arch images.
+func (s *proxySuite) TestProxyPolicyRejectAll() {
+	t := s.T()
+	tempd := t.TempDir()
+	policyPath := tempd + "/policy.json"
+	err := os.WriteFile(policyPath, []byte("{ \"default\": [ { \"type\":\"reject\"} ] }"), 0o644)
+	require.NoError(t, err)
+	p, err := newProxy("--override-arch", "amd64", "--policy", policyPath)
+	require.NoError(t, err)
+
+	err = runTestMetadataAPIs(p, knownNotManifestListedImageX8664)
+	assert.ErrorContains(t, err, "is rejected by policy")
+
+	err = runTestMetadataAPIs(p, knownListImage)
+	assert.ErrorContains(t, err, "is rejected by policy")
+
+	// This one should continue to be fine.
+	err = runTestOpenImageOptionalNotFound(p, knownNotExtantImage)
+	if err != nil {
+		err = fmt.Errorf("Testing optional image %s: %v", knownNotExtantImage, err)
+	}
+	assert.NoError(t, err)
+}
